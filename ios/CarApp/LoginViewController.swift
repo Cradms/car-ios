@@ -111,6 +111,14 @@ final class LoginViewController: UIViewController {
         stack.addArrangedSubview(pinField)
         stack.setCustomSpacing(20, after: pinField)
         stack.addArrangedSubview(loginButton)
+
+        let pasteButton = UIButton(type: .system)
+        pasteButton.setTitle("已有 token？直接粘贴凭证登录", for: .normal)
+        pasteButton.titleLabel?.font = .systemFont(ofSize: 12.5)
+        pasteButton.setTitleColor(UIColor(red: 47/255, green: 111/255, blue: 181/255, alpha: 1), for: .normal)
+        pasteButton.addTarget(self, action: #selector(onPasteToken), for: .touchUpInside)
+        stack.addArrangedSubview(pasteButton)
+
         stack.addArrangedSubview(statusLabel)
     }
 
@@ -169,6 +177,71 @@ final class LoginViewController: UIViewController {
                     self.timer?.invalidate()
                     self.onDone?()
                 }
+            }
+        }
+    }
+
+    /// 粘贴格式（任选其一）：
+    ///   access|refresh|carId
+    ///   或直接贴 data.json 里的 JSON 片段
+    @objc private func onPasteToken() {
+        let a = UIAlertController(
+            title: "粘贴凭证",
+            message: "格式：access_token|refresh_token|carId\n也可以直接贴 JSON 片段",
+            preferredStyle: .alert)
+        a.addTextField { $0.placeholder = "access|refresh|carId"
+            $0.autocapitalizationType = .none
+            $0.autocorrectionType = .no }
+        a.addAction(UIAlertAction(title: "取消", style: .cancel))
+        a.addAction(UIAlertAction(title: "登录", style: .default) { [weak self] _ in
+            guard let self = self,
+                  let raw = a.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !raw.isEmpty else { return }
+            self.applyManualToken(raw)
+        })
+        present(a, animated: true)
+    }
+
+    private func applyManualToken(_ raw: String) {
+        var at = "", rt = "", cid = ""
+        if raw.contains("{") {
+            // JSON 片段
+            if let d = raw.data(using: .utf8),
+               let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
+                at = (o["real_access_token"] as? String) ?? (o["access_token"] as? String) ?? ""
+                rt = (o["real_refresh_token"] as? String) ?? (o["refresh_token"] as? String) ?? ""
+                cid = (o["real_car_id"] as? String) ?? (o["car_id"] as? String) ?? ""
+            }
+        } else {
+            let parts = raw.split(separator: "|").map { String($0).trimmingCharacters(in: .whitespaces) }
+            if parts.count >= 3 {
+                at = parts[0]; rt = parts[1]; cid = parts[2]
+            } else if parts.count == 1 {
+                at = parts[0]
+            }
+        }
+        guard !at.isEmpty else { setStatus("没解析出 access_token", error: true); return }
+
+        CarAPI.shared.accessToken = at
+        if !rt.isEmpty { CarAPI.shared.refreshToken = rt }
+        setStatus("校验中…")
+        CarAPI.shared.loadCar { ok, name in
+            if ok {
+                if !cid.isEmpty { CarAPI.shared.carId = cid }
+                self.setStatus("已进入 · \(name)")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.timer?.invalidate()
+                    self.onDone?()
+                }
+            } else if !cid.isEmpty {
+                // 拉不到车辆但 carId 给了，也放行（token 可能刚好过期）
+                CarAPI.shared.carId = cid
+                self.setStatus("已保存凭证，进入试试")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.onDone?()
+                }
+            } else {
+                self.setStatus("token 无效或已过期", error: true)
             }
         }
     }
