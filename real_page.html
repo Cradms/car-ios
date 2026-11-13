@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>接入真实车辆</title>
+<style>
+:root{--bg:#05070d;--card:rgba(148,163,184,.08);--bd:rgba(148,163,184,.16);--txt:#e2e8f0;--mut:#7d8aa3;--red:#ff5a52}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--txt);
+ font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+ display:flex;align-items:center;justify-content:center;padding:20px}
+.box{width:100%;max-width:26rem;background:linear-gradient(165deg,rgba(148,163,184,.10),rgba(148,163,184,.04));
+ border:1px solid var(--bd);border-radius:20px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+h1{font-size:17px;margin:0 0 4px}
+p.sub{margin:0 0 18px;font-size:11.5px;color:var(--mut);line-height:1.6}
+label{display:block;font-size:11px;color:var(--mut);margin:14px 0 6px}
+input{width:100%;background:rgba(5,8,16,.6);border:1px solid var(--bd);border-radius:12px;
+ padding:11px 13px;color:var(--txt);font-size:14px;outline:none;font-family:inherit;letter-spacing:.5px}
+input:focus{border-color:rgba(255,90,82,.55);box-shadow:0 0 0 3px rgba(255,90,82,.12)}
+.row{display:flex;gap:9px}
+.row input{flex:1}
+button{width:100%;margin-top:18px;padding:12px;border-radius:12px;border:1px solid var(--red);
+ background:linear-gradient(135deg,#ff5a52,#ef4444);color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+button.ghost{margin-top:9px;background:rgba(148,163,184,.10);border-color:var(--bd);color:var(--txt);
+ font-weight:500;font-size:13px;padding:11px}
+.msg{margin-top:12px;font-size:12px;min-height:16px;line-height:1.5}
+.ok{color:#34d399}.err{color:#f87171}.info{color:#93b4d8}
+.hint{margin-top:14px;font-size:11px;color:var(--mut);line-height:1.7;border-top:1px solid var(--bd);padding-top:12px}
+a{color:#7d8aa3;font-size:11px;display:inline-block;margin-top:14px;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>接入真实车辆 <span style="font-size:11px;color:#7d8aa3;font-weight:400">v2</span></h1>
+  <p class="sub">用长安车联网绑定的手机号收一条验证码，登录后所有车况与控车都走官方接口，不再是模拟数据。</p>
+
+  <label>车主手机号</label>
+  <div class="row">
+    <input id="phone" inputmode="numeric" maxlength="11" placeholder="11 位手机号">
+    <button id="smsBtn" style="width:auto;margin-top:0;padding:0 14px;font-size:12px;white-space:nowrap;flex:0 0 auto">获取验证码</button>
+  </div>
+
+  <label>短信验证码</label>
+  <input id="code" inputmode="numeric" maxlength="6" placeholder="6 位验证码">
+
+  <label>控车码 PIN（6 位，用于登录本系统并控车）</label>
+  <input id="pin" inputmode="numeric" maxlength="6" placeholder="长安引力域 App 里设置的安全码">
+
+  <button id="go">登录并进入控车页</button>
+  <div id="msg" class="msg"></div>
+
+  <div class="hint">
+    验证码由长安官方短信通道下发，只用于换取登录凭证。<br>
+    登录凭证保存在本服务器，会自动续期，不需要你再操作。
+  </div>
+  <a href="/">返回登录页</a>
+</div>
+<script>
+var msg = document.getElementById('msg');
+function say(t, cls){ msg.textContent = t || ''; msg.className = 'msg ' + (cls || ''); }
+var smsBtn = document.getElementById('smsBtn'), goBtn = document.getElementById('go');
+var cd = 0, timer = null;
+
+function validPhone(v){ return /^1\d{10}$/.test(v); }
+
+smsBtn.onclick = function(){
+  var phone = document.getElementById('phone').value.replace(/\D/g,'');
+  if(!validPhone(phone)) return say('请输入 11 位手机号','err');
+  smsBtn.disabled = true; say('正在发送…','info');
+  fetch('/api/real/sms', {method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({phone:phone})})
+  .then(function(r){return r.json();})
+  .then(function(res){
+    if(!res.success) throw new Error(res.message || '发送失败');
+    say('验证码已发送，请查看短信','ok');
+    cd = 60; timer = setInterval(function(){
+      cd--;
+      if(cd<=0){ clearInterval(timer); smsBtn.disabled=false; smsBtn.textContent='重新获取'; }
+      else smsBtn.textContent = cd + 's';
+    },1000);
+  })
+  .catch(function(e){ say(e.message,'err'); smsBtn.disabled=false; });
+};
+
+goBtn.onclick = function(){
+  var phone = document.getElementById('phone').value.replace(/\D/g,'');
+  var code  = document.getElementById('code').value.replace(/\D/g,'');
+  var pin   = document.getElementById('pin').value.replace(/\D/g,'');
+  if(!validPhone(phone)) return say('手机号格式不对','err');
+  if(code.length!==6)    return say('请输入 6 位验证码','err');
+  if(pin.length<4)       return say('控车码至少 4 位','err');
+  goBtn.disabled = true; say('正在登录…','info');
+  fetch('/api/real/login', {method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({phone:phone, code:code, pin:pin})})
+  .then(function(r){return r.json();})
+  .then(function(res){
+    if(!res.success) throw new Error(res.message || '登录失败');
+    try{
+      localStorage.setItem('phone', phone);
+      localStorage.setItem('pin', pin);
+      localStorage.setItem('ref_token', res.refresh_token || '');
+      localStorage.setItem('replica_real_upstream','1');
+      if (res.car_name) localStorage.setItem('car_name', res.car_name);
+      if (res.plate) localStorage.setItem('car_plate', res.plate);
+      if (res.car_id) localStorage.setItem('car_id', res.car_id);
+    }catch(e){}
+    say('登录成功' + (res.car_name ? '（' + res.car_name + (res.plate ? ' ' + res.plate : '') + '）' : '') + '，正在进入…','ok');
+    setTimeout(function(){ location.href = '/user_info'; }, 600);
+  })
+  .catch(function(e){ say(e.message,'err'); goBtn.disabled=false; });
+};
+</script>
+</body>
+</html>

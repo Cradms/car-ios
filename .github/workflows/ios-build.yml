@@ -1,0 +1,55 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: cd ios && xcodegen generate
+
+      - name: Build (no code sign)
+        run: |
+          cd ios
+          xcodebuild \
+            -project CarApp.xcodeproj \
+            -scheme CarApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | tail -40
+
+      - name: Package IPA
+        run: |
+          cd ios
+          mkdir -p Payload
+          APP_PATH="build/Build/Products/Release-iphoneos/CarApp.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "找不到 .app，列出产物："
+            find build/Build/Products -maxdepth 3 -name "*.app"
+            exit 1
+          fi
+          cp -R "$APP_PATH" Payload/
+          zip -qry CarApp-unsigned.ipa Payload
+          ls -lh CarApp-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarApp-unsigned-ipa
+          path: ios/CarApp-unsigned.ipa
+          retention-days: 30

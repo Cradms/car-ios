@@ -1,0 +1,26 @@
+name: CarApp
+options:
+  bundleIdPrefix: com.yg
+  deploymentTarget:
+    iOS: "14.0"
+  createIntermediateGroups: true
+
+targets:
+  CarApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: CarApp
+    settings:
+      base:
+        INFOPLIST_FILE: CarApp/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.yg.carapp
+        PRODUCT_NAME: CarApp
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        ENABLE_BITCODE: "NO"

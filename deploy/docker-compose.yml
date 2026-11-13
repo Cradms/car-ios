@@ -1,0 +1,25 @@
+services:
+  replica:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: car-replica:latest
+    container_name: car-replica
+    restart: unless-stopped
+    # 只监听本机，由 Nginx 反代；要直接对外就改成 "8080:8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      REPLICA_ENV: prod
+      # 上线前必须改这两个！不设置则用默认值（不适合公网）
+      ADMIN_PASS: ${ADMIN_PASS:-admin888}
+      DEMO_PIN: ${DEMO_PIN:-123456}
+      DEMO_PHONE: ${DEMO_PHONE:-13800138000}
+    volumes:
+      # 账号/白名单/圈子等数据落在宿主机，重建容器不丢
+      - ./data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

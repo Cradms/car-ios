@@ -1,0 +1,30 @@
+# /etc/systemd/system/car-replica.service
+# 不用 Docker 时，直接用 systemd 常驻
+#   sudo cp deploy/replica.service /etc/systemd/system/car-replica.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now car-replica
+#   journalctl -u car-replica -f
+
+[Unit]
+Description=Car Replica (remote control demo)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/car-replica
+Environment=REPLICA_ENV=prod
+Environment=HOST=127.0.0.1
+Environment=DATA_FILE=/var/lib/car-replica/data.json
+Environment=LOG_FILE=/var/lib/car-replica/requests.log
+Environment=ADMIN_PASS=CHANGE_ME_ON_SERVER
+ExecStartPre=/usr/bin/python3 /opt/car-replica/build.py
+ExecStart=/usr/bin/python3 /opt/car-replica/server.py 8080
+Restart=always
+RestartSec=3
+StateDirectory=car-replica
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
