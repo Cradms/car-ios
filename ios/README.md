@@ -1,79 +1,83 @@
-# 车控 iOS App（WKWebView 壳）
+# 车控 iOS App（原生直连版）
 
-把服务器上的页面装成 iPhone 桌面 App。Swift + WKWebView，无第三方依赖。
+**不依赖自建服务器**，App 内部直接调长安接口。UI 复用现有 H5 页面（打包进 App），数据层全部是原生 Swift。
 
-## 一、先改服务器地址
+## 架构
 
-打开 `ios/CarApp/Info.plist`，找到：
-
-```xml
-<key>ServerURL</key>
-<string>http://192.168.123.72:8088</string>
+```
+App
+├── WebViewController       加载 carapp://local/index.html（包内页面）
+├── LocalSchemeHandler      拦截 carapp://local/api/*  →  转发原生
+├── CarAPI                  URLSession 直连 m.iov.changan.com.cn
+├── RSACrypto               RSA-OAEP(SHA256) 加密控车指令
+├── LoginViewController     手机号 + 短信验证码 + 控车码
+└── Resources/site/         打包进 App 的 H5 页面（121 个文件，13MB）
 ```
 
-这里默认是**局域网地址**，只有手机连同一个 WiFi 才能访问。要出门也能用，换成你的公网地址（内网穿透 / DDNS / 云服务器），例如：
+H5 里原来的 `fetch('/api/real/cardata')` 会自动变成 `carapp://local/api/real/cardata`，
+被 `LocalSchemeHandler` 拦下来交给原生处理。**页面代码一行没改。**
 
-```xml
-<string>https://car.yourdomain.com</string>
+## 已实现的接口
+
+| H5 请求 | 原生实现 |
+| --- | --- |
+| `/api/real/session` | 检查 Keychain 里的登录态 |
+| `/api/real/sms` | `POST /api/sms/sendAuthcode` |
+| `/api/real/login` | `POST /app2/api/oauth2login/token/stageOne` |
+| `/api/real/cardata` | `POST /app2/api/car/data` |
+| `/api/real/location` | `GET /app2/api/car/location` |
+| `/api/real/energy` | `GET /app2/api/car-report/car-energy-trend` |
+| `/api/real/maintenance` | `GET /mt/uc/api/maintenance/next` + `/history` |
+| `/api/real/control` | 取 pinVerifyCode → 取公钥 → RSA 加密 → `v3/control/execute` |
+| `/api/oil/price` | `api.qqsuu.cn` 当日油价 |
+
+其余接口（油耗记账、告警配置等）目前返回空成功，页面不会报错，只是没数据。
+
+## 登录流程
+
+App 首次启动 → 弹出原生登录页：
+
+```
+手机号  [ 11 位        ]
+验证码  [ 6 位 ] [获取验证码]     ← 60 秒倒计时
+控车码  [ 6 位 ····   ]           ← 长安 App 里设置的那个
+        [ 登录 ]
 ```
 
-> 用 https 的话，`NSAppTransportSecurity` 那一段可以删掉。
+登录成功后 token 存 Keychain，车名/车牌自动拉取，之后直接进主页。
+token 过期会自动用 refresh_token 换新的，不用重新登录。
 
-## 二、生成 IPA（三种方式，任选）
+## 编译
 
-### 方式 A：GitHub Actions（不用 Mac）
-
-1. 把整个 `replica` 目录推到一个 GitHub 仓库
-2. 仓库的 `Actions` 页签会看到 `Build unsigned IPA`，点 `Run workflow`
-3. 等 3~5 分钟，进这次运行，底部 `Artifacts` 下载 `CarApp-unsigned-ipa`
-4. 解压得到 `CarApp-unsigned.ipa`
-
-工作流已经配好（`.github/workflows/ios-build.yml`），自动装 XcodeGen、生成工程、编译、打包 IPA。
-
-### 方式 B：Mac + Xcode（有 Mac 最快）
+### GitHub Actions（推荐，不用 Mac）
 
 ```bash
-brew install xcodegen
-cd ios
-xcodegen generate
-open CarApp.xcodeproj
+GH_USER=你的用户名 GH_TOKEN=你的token ./push-github.sh
 ```
 
-Xcode 里选你的开发者账号 → 连接 iPhone → Run。
-要导出 IPA：`Product > Archive > Distribute App > Custom > 导出 .ipa`。
+推上去后进 Actions 页签，`Build unsigned IPA` 会自动跑（约 3~5 分钟），
+产物在 run 详情页底部 `Artifacts` → `CarApp-unsigned-ipa`。
 
-### 方式 C：在线打包
+### 本地 Mac
 
-搜索「iOS 在线打包 / 云端编译」，上传源码 zip，选 Xcode 版本，它会返回 ipa。适合没有 Mac 也不想用 GitHub 的情况。
+```bash
+python build.py          # 先生成 site/
+./ios/sync_site.sh       # 同步页面进 App 资源
+brew install xcodegen
+cd ios && xcodegen generate && open CarApp.xcodeproj
+```
 
-## 三、签名安装
+Xcode 里选账号 → 连手机 → Run，或 `Product > Archive` 导出 ipa。
 
-拿到未签名 ipa 后，用你手上的工具签名：
+## 签名
 
-| 工具 | 适用 |
+| 工具 | 说明 |
 | --- | --- |
-| **Sideloadly** | Windows/Mac，用 Apple ID 免费签，7 天有效期 |
-| **AltStore** | 同上，自动续签 |
-| **TrollStore** | 仅限 A12~A15 + iOS 14~16.6.1，永久免签 |
-| **企业签 / 超级签** | 买证书，装完不掉签 |
-| **Xcode 直接 Run** | 有 Mac 时最省事，免费账号 7 天 |
+| Sideloadly / AltStore | Apple ID 免费签，7 天 |
+| TrollStore | A12~A15 + iOS 14~16.6.5，永久 |
+| 企业签 | 买证书，不掉签 |
 
-免费账号签的 App 每 7 天要重签一次；付费开发者账号（$99/年）签的是 1 年。
-
-## 四、这个壳做了什么
-
-| 能力 | 说明 |
-| --- | --- |
-| 全屏 WebView | 无地址栏，像原生 App |
-| 下拉刷新 | 顶部下拉重新加载 |
-| 加载时间戳 | 每次启动带 `?t=时间戳`，避免缓存旧页面 |
-| 弹窗兼容 | `alert / confirm / prompt` 自动转原生弹窗 |
-| 外链处理 | 非本站域名（高德导航、支付）自动跳系统浏览器 |
-| 定位授权 | 请求 `WhenInUse`，页面地图可读当前位置 |
-| 相机/相册 | 已配权限说明，页面 `<input type=file>` 可用 |
-| 原生桥 | `window.webkit.messageHandlers.native.postMessage("refresh")` 可触发刷新 |
-
-## 五、改 Bundle ID
+## 改 Bundle ID
 
 `ios/project.yml`：
 
@@ -81,25 +85,11 @@ Xcode 里选你的开发者账号 → 连接 iPhone → Run。
 PRODUCT_BUNDLE_IDENTIFIER: com.yg.carapp
 ```
 
-改成你自己的（比如 `com.你的名字.carapp`），否则和别人的签名证书可能冲突。
+换成你自己的，避免和别人的证书冲突。
 
-## 六、已知限制
+## 注意
 
-- **页面依赖服务器**：App 只是壳，服务器挂了页面就白屏。要离线用，得把后端也搬进 App（Python 跑不了，需要 Node/Go 重写并内嵌）。
-- **推送**：Bark 推送走的是 Bark App，不受影响；但这个壳本身没有 APNs 能力，要原生推送得加推送证书和 `UNUserNotificationCenter`。
-- **后台保活**：iOS 限制，App 退到后台会被挂起，需要后台任务得申请 `BGTaskScheduler`。
-
-## 七、文件清单
-
-```
-ios/
-├── project.yml                    # XcodeGen 配置
-├── CarApp/
-│   ├── AppDelegate.swift          # 启动
-│   ├── WebViewController.swift    # WebView 主体
-│   ├── Info.plist                 # 地址 / 权限 / ATS
-│   └── Assets.xcassets/
-│       └── AppIcon.appiconset/
-│           └── icon-1024.png      # 图标（可换）
-.github/workflows/ios-build.yml    # 自动编译 IPA
-```
+- **控车码必须填对**：控车指令要用它做 RSA 加密的 pin 字段，错了会被长安拒绝
+- **首次登录要短信验证码**：和车机 App 同一账号
+- **页面改了要重新同步**：改完 H5 跑一次 `./ios/sync_site.sh`
+- **推送仍是 Bark**：这个 App 没有接 APNs，通知走 Bark App
