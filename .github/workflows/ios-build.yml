@@ -17,6 +17,9 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Sync web assets into app bundle
+        run: chmod +x ios/sync_site.sh && ./ios/sync_site.sh
+
       - name: Generate Xcode project
         run: cd ios && xcodegen generate
 

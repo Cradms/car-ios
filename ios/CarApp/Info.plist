@@ -21,10 +21,6 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 
-	<!-- 改这一行就能换服务器地址 -->
-	<key>ServerURL</key>
-	<string>http://192.168.123.72:8088</string>
-
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchScreen</key>

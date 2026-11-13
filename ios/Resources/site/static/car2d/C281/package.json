@@ -1,0 +1,11 @@
+{
+  "name": "cvim_C281",
+  "identifier": "cvim.C281",
+  "description": "",
+  "version": "1.0.3",
+  "dependencies": {},
+  "build": 4,
+  "funStatus":true,
+  "releaseNote": "",
+  "hidden": false
+}

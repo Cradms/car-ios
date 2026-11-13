@@ -11,6 +11,10 @@ targets:
     platform: iOS
     sources:
       - path: CarApp
+      # 包内 H5 页面：以 folder 方式整体打包，保留目录结构
+      - path: Resources/site
+        type: folder
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: CarApp/Info.plist

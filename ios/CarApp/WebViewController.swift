@@ -5,21 +5,12 @@ import CoreLocation
 final class WebViewController: UIViewController,
                                WKNavigationDelegate,
                                WKUIDelegate,
-                               WKScriptMessageHandler,
                                CLLocationManagerDelegate {
 
     private var webView: WKWebView!
     private var refreshControl: UIRefreshControl!
     private let locManager = CLLocationManager()
-
-    /// 服务器地址：优先读 Info.plist 的 ServerURL，可在 Xcode 里直接改
-    private var serverURL: URL {
-        if let s = Bundle.main.object(forInfoDictionaryKey: "ServerURL") as? String,
-           let u = URL(string: s.trimmingCharacters(in: .whitespacesAndNewlines)) {
-            return u
-        }
-        return URL(string: "http://192.168.123.72:8088")!
-    }
+    private lazy var schemeHandler = LocalSchemeHandler()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -29,18 +20,12 @@ final class WebViewController: UIViewController,
         cfg.allowsInlineMediaPlayback = true
         cfg.mediaTypesRequiringUserActionForPlayback = []
         cfg.preferences.javaScriptCanOpenWindowsAutomatically = true
-        // 允许页面用 localStorage 持久化
-        cfg.websiteDataStore = .default()
-
-        let ucc = WKUserContentController()
-        ucc.add(self, name: "native")
-        cfg.userContentController = ucc
+        cfg.setURLSchemeHandler(schemeHandler, forURLScheme: LocalSchemeHandler.scheme)
 
         webView = WKWebView(frame: .zero, configuration: cfg)
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
-        webView.scrollView.bounces = true
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
@@ -64,17 +49,28 @@ final class WebViewController: UIViewController,
         load()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // 未登录时先弹登录页
+        if !CarAPI.shared.isLoggedIn, presentedViewController == nil {
+            showLogin()
+        }
+    }
+
     private func load() {
-        // 带上时间戳避免缓存旧页面
-        var comps = URLComponents(url: serverURL, resolvingAgainstBaseURL: false)
-        var items = comps?.queryItems ?? []
-        items.append(URLQueryItem(name: "t", value: "\(Int(Date().timeIntervalSince1970))"))
-        comps?.queryItems = items
-        let target = comps?.url ?? serverURL
-        var req = URLRequest(url: target)
+        guard let u = URL(string: "\(LocalSchemeHandler.scheme)://\(LocalSchemeHandler.host)/index.html") else { return }
+        var req = URLRequest(url: u)
         req.timeoutInterval = 30
-        req.cachePolicy = .reloadIgnoringLocalCacheData
         webView.load(req)
+    }
+
+    func showLogin() {
+        let vc = LoginViewController()
+        vc.modalPresentationStyle = .fullScreen
+        vc.onDone = { [weak self] in
+            self?.dismiss(animated: true) { self?.load() }
+        }
+        present(vc, animated: true)
     }
 
     @objc private func onRefresh() {
@@ -94,11 +90,9 @@ final class WebViewController: UIViewController,
     func webView(_ webView: WKWebView,
                  decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard let url = navigationAction.request.url else {
-            decisionHandler(.allow); return
-        }
-        // 高德 / 电话 / 邮件 / 外链交给系统
+        guard let url = navigationAction.request.url else { decisionHandler(.allow); return }
         let scheme = url.scheme?.lowercased() ?? ""
+        if scheme == LocalSchemeHandler.scheme { decisionHandler(.allow); return }
         if !["http", "https", "file", "about"].contains(scheme) {
             if UIApplication.shared.canOpenURL(url) {
                 UIApplication.shared.open(url, options: [:], completionHandler: nil)
@@ -106,13 +100,9 @@ final class WebViewController: UIViewController,
             decisionHandler(.cancel)
             return
         }
-        // 非本机域名的 http(s) 用 Safari 打开（导航、支付等）
-        if let host = url.host, let selfHost = serverURL.host, host != selfHost {
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
-            decisionHandler(.cancel)
-            return
-        }
-        decisionHandler(.allow)
+        // 外部 http(s)（高德导航、支付）交给系统
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        decisionHandler(.cancel)
     }
 
     // MARK: - WKUIDelegate
@@ -150,7 +140,6 @@ final class WebViewController: UIViewController,
         present(a, animated: true)
     }
 
-    /// iOS 15+ 摄像头/麦克风授权透传
     @available(iOS 15.0, *)
     func webView(_ webView: WKWebView,
                  requestMediaCapturePermissionFor origin: WKSecurityOrigin,
@@ -160,19 +149,7 @@ final class WebViewController: UIViewController,
         decisionHandler(.prompt)
     }
 
-    // MARK: - WKScriptMessageHandler
+    // MARK: - CLLocation
 
-    func userContentController(_ userContentController: WKUserContentController,
-                               didReceive message: WKScriptMessage) {
-        // 预留：页面可通过 window.webkit.messageHandlers.native.postMessage("refresh") 触发刷新
-        if let cmd = message.body as? String, cmd == "refresh" {
-            webView.reload()
-        }
-    }
-
-    // MARK: - CLLocationManagerDelegate
-
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        // 授权变化后无需额外处理，WebView 自行读取
-    }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {}
 }

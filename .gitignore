@@ -29,3 +29,7 @@ data.json.*
 *.out
 check.py
 patch_login.py
+
+# 例外：iOS 包内页面需要进仓库
+!ios/Resources/
+!ios/Resources/**
