@@ -54,7 +54,7 @@ enum RSACrypto {
             0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00
         ]
         let bitString = [UInt8](arrayLiteral: 0x00) + [UInt8](pkcs1)   // 前导 0（无未用位）
-        var inner = algoId + derTag(0x03, bitString)
+        let inner = algoId + derTag(0x03, bitString)
         return Data(derTag(0x30, inner))
     }
 
