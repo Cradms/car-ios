@@ -27,6 +27,7 @@ workflows:
 
       - name: 编译（不签名）
         script: |
+          set -eo pipefail
           cd ios
           xcodebuild \
             -project CarApp.xcodeproj \
@@ -37,15 +38,31 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            | tail -40
-          find build/Build/Products -maxdepth 3 -name "*.app"
+            build 2>&1 | tee /tmp/build.log | tail -50
+          echo "---- 产物扫描 ----"
+          find build -name "*.app" -maxdepth 5 -print
 
       - name: 打包 IPA
         script: |
+          set -e
           cd ios
+          APP=$(find build -name "*.app" -maxdepth 5 -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "❌ 没找到 .app，编译可能失败。build 目录结构："
+            find build -maxdepth 4 -type d | head -30
+            echo "---- 编译日志尾部 ----"
+            tail -60 /tmp/build.log || true
+            exit 1
+          fi
+          echo "找到产物：$APP"
+          du -sh "$APP"
+          rm -rf Payload CarApp-unsigned.ipa
           mkdir -p Payload
-          cp -R build/Build/Products/Release-iphoneos/CarApp.app Payload/
+          cp -R "$APP" Payload/
+          ls -la Payload/
           zip -qry CarApp-unsigned.ipa Payload
+          echo "---- ipa 内容 ----"
+          unzip -l CarApp-unsigned.ipa | head -8
           ls -lh CarApp-unsigned.ipa
     artifacts:
       - ios/CarApp-unsigned.ipa
