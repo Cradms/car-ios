@@ -221,6 +221,45 @@ final class CarAPI {
         }
     }
 
+    // MARK: - 消息 / 自检 / 历史
+
+    /// 未读数
+    func unreadCount(done: @escaping (Int) -> Void) {
+        request("/appserver/api/information/getUnReadInfoNumber",
+                query: ["token": accessToken]) { obj in
+            let n = (obj?["data"] as? Int) ?? ((obj?["data"] as? [String: Any])?["count"] as? Int) ?? 0
+            done(n)
+        }
+    }
+
+    /// 消息列表
+    func messages(page: Int = 1, size: Int = 20,
+                  done: @escaping ([[String: Any]]) -> Void) {
+        request("/appserver/api/information/pageReceiverInfo",
+                query: ["currentPage": "\(page)", "pageSize": "\(size)",
+                        "token": accessToken],
+                method: "POST", form: ["actionType": "1"]) { obj in
+            let d = obj?["data"]
+            var arr: [[String: Any]] = []
+            if let a = d as? [[String: Any]] { arr = a }
+            else if let dic = d as? [String: Any] {
+                arr = (dic["records"] as? [[String: Any]])
+                    ?? (dic["list"] as? [[String: Any]])
+                    ?? (dic["rows"] as? [[String: Any]]) ?? []
+            }
+            done(arr)
+        }
+    }
+
+    /// 车辆自检项
+    func checkItems(done: @escaping ([[String: Any]]) -> Void) {
+        request("/appserver/api/carcheck/getAllCheckItem",
+                query: ["carId": carId, "token": accessToken],
+                method: "POST") { obj in
+            done((obj?["data"] as? [[String: Any]]) ?? [])
+        }
+    }
+
     // MARK: - 控车
 
     /// 下发一条控车指令（内部完成：取 pinVerifyCode → 取公钥 → RSA 加密 → 下发）

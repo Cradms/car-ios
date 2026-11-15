@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 // MARK: - 主题色
 enum C {
@@ -486,11 +487,29 @@ struct CarHomeView: View {
             guard ok else { loading = false; return }
             api.carData { d in
                 DispatchQueue.main.async {
-                    if let d = d { st = CarState(d) }
+                    if let d = d {
+                        st = CarState(d)
+                        AppGroupStore.sync(st)
+                        AppGroupStore.syncCredentials()
+                        WidgetCenter.shared.reloadAllTimelines()
+                    }
                     loading = false
                 }
             }
         }
+    }
+
+    private func cmdLabel(_ c: String) -> String {
+        let map: [String: String] = [
+            "LockDoor": "锁车", "UnLockDoor": "解锁",
+            "OpenWindow": "开窗", "CloseWindow": "关窗",
+            "VentWindow": "留缝", "OpenSunroof": "开天窗",
+            "CloseSunroof": "关天窗", "OpenEngine": "启动",
+            "CloseEngine": "熄火", "openair": "开空调", "closeair": "关空调",
+            "FlashLight": "闪灯", "Whistle": "鸣笛",
+            "RemoteSearchCar": "寻车"
+        ]
+        return map[c] ?? c
     }
 
     private func cmd(_ name: String, _ hint: String) {
@@ -503,6 +522,7 @@ struct CarHomeView: View {
         }
         toast = hint
         api.control(cmd: name) { ok, msg in
+            OpLogStore.append(OpLog(cmd: cmdLabel(name), ok: ok, msg: msg, time: Date()))
             DispatchQueue.main.async {
                 toast = nil
                 resultTitle = ok ? "已下发" : "下发失败"
