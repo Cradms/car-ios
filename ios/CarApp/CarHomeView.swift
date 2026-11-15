@@ -36,7 +36,10 @@ struct CarHomeView: View {
     @State private var toast: String?
     @State private var showLogin = false
     @State private var showPinSheet = false
-    @State private var pinpointText = ""
+    @State private var pinInput = ""
+    @State private var resultTitle = ""
+    @State private var resultMsg = ""
+    @State private var showResult = false
 
     private let api = CarAPI.shared
 
@@ -60,11 +63,31 @@ struct CarHomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        refresh()
+                    Button { refresh() } label: {
+                        Image(systemName: "arrow.clockwise").foregroundColor(C.blue)
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            pinInput = CarAPI.shared.controlPin
+                            showPinSheet = true
+                        } label: {
+                            Label("设置控车码", systemImage: "lock.shield")
+                        }
+                        Button {
+                            showLogin = true
+                        } label: {
+                            Label("重新登录", systemImage: "person.badge.key")
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            logout()
+                        } label: {
+                            Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
                     } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(C.blue)
+                        Image(systemName: "ellipsis.circle").foregroundColor(C.blue)
                     }
                 }
             }
@@ -93,6 +116,53 @@ struct CarHomeView: View {
                 showLogin = false
                 refresh()
             }
+        }
+        .sheet(isPresented: $showPinSheet) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("控车码")
+                    .font(.system(size: 17, weight: .semibold))
+                Text("长安 App 里设置的 6 位安全码，控车指令要用它做 RSA 加密")
+                    .font(.system(size: 12)).foregroundColor(C.muted)
+                SecureField("6 位数字", text: $pinInput)
+                    .keyboardType(.numberPad)
+                    .padding(12)
+                    .background(C.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(C.border))
+                Button {
+                    CarAPI.shared.controlPin = pinInput
+                    showPinSheet = false
+                    toast = "控车码已保存"
+                } label: {
+                    Text("保存")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity).frame(height: 46)
+                        .background(C.blue)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                Spacer()
+            }
+            .padding(22)
+            .background(C.bg.ignoresSafeArea())
+            .presentationDetents([.height(280)])
+        }
+        .alert(resultTitle, isPresented: $showResult) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(resultMsg)
+        }
+    }
+
+    private func logout() {
+        CarAPI.shared.accessToken = ""
+        CarAPI.shared.refreshToken = ""
+        CarAPI.shared.carId = ""
+        CarAPI.shared.controlPin = ""
+        st = CarState()
+        toast = "已退出登录"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            showLogin = true
         }
     }
 
@@ -424,15 +494,23 @@ struct CarHomeView: View {
     }
 
     private func cmd(_ name: String, _ hint: String) {
+        // 没有控车码先拦下来，直接引导设置
+        if CarAPI.shared.controlPin.isEmpty {
+            resultTitle = "缺少控车码"
+            resultMsg = "控车指令要用控车码做 RSA 加密。\n请先到长安 App 确认 6 位安全码，再点右上角「设置控车码」。"
+            showResult = true
+            return
+        }
         toast = hint
         api.control(cmd: name) { ok, msg in
             DispatchQueue.main.async {
-                toast = ok ? "✓ \(msg)" : "✗ \(msg)"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    if toast?.hasPrefix("✓") == true || toast?.hasPrefix("✗") == true { toast = nil }
+                toast = nil
+                resultTitle = ok ? "已下发" : "下发失败"
+                resultMsg = msg.isEmpty ? (ok ? "指令已发出，稍等几秒刷新看状态" : "未知错误") : msg
+                showResult = true
+                if ok {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { refresh() }
                 }
-                // 3 秒后刷车况
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { refresh() }
             }
         }
     }
