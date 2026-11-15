@@ -167,13 +167,17 @@ struct CarHomeView: View {
         }
     }
 
-    // MARK: 顶部车名
+    // MARK: 顶部车名 + 车模图（按车型归一化选图，与源码 CarModelImage 一致）
     private var headerCard: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(st.carName.isEmpty ? "我的爱车" : st.carName)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 21, weight: .bold))
                     .foregroundColor(C.txt)
+                    .lineLimit(1)
+                Text(modelTitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(C.blue)
                 HStack(spacing: 6) {
                     Circle()
                         .fill(st.online ? C.green : C.faint)
@@ -181,17 +185,19 @@ struct CarHomeView: View {
                     Text(st.online ? "在线" : "离线")
                         .font(.system(size: 11.5))
                         .foregroundColor(C.muted)
-                    if !st.terminalTime.isEmpty {
-                        Text("· \(String(st.terminalTime.suffix(8)))")
+                    if st.updatedAt > 0 {
+                        Text("· \(timeText)")
                             .font(.system(size: 11))
                             .foregroundColor(C.faint)
                     }
                 }
             }
-            Spacer()
-            Image(systemName: "car.side.fill")
-                .font(.system(size: 34))
-                .foregroundColor(C.blue.opacity(0.85))
+            Spacer(minLength: 4)
+            Image(carImage)
+                .resizable()
+                .scaledToFit()
+                .frame(height: 74)
+                .shadow(color: C.blue.opacity(0.18), radius: 8, x: 0, y: 6)
         }
         .padding(16)
         .frame(maxWidth: .infinity)
@@ -200,6 +206,28 @@ struct CarHomeView: View {
                            startPoint: .topLeading, endPoint: .bottomTrailing)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// 车型图资源名：命中车型用专属图，否则通用图
+    private var carImage: String {
+        let code = CarModel.normalize(st.seriesName.isEmpty ? st.series : st.seriesName)
+        return code.isEmpty ? "car" : "car_" + code.lowercased()
+    }
+
+    private var modelTitle: String {
+        let code = CarModel.normalize(st.seriesName.isEmpty ? st.series : st.seriesName)
+        let n = CarModel.name(code)
+        if !n.isEmpty { return n }
+        if !st.seriesName.isEmpty { return st.seriesName }
+        return st.seriesName
+    }
+
+    private var timeText: String {
+        let t = st.updatedAt > 1_000_000_000 ? Double(st.updatedAt) / 1000.0 : Double(st.updatedAt)
+        let d = Date(timeIntervalSince1970: t)
+        let f = DateFormatter()
+        f.dateFormat = "MM-dd HH:mm"
+        return f.string(from: d)
     }
 
     private var loginPrompt: some View {
@@ -227,24 +255,10 @@ struct CarHomeView: View {
                 if loading {
                     ProgressView().padding(.vertical, 20)
                 } else {
-                    // 油量 + 续航
+                    // 续航（4.5.6 车况主字段）+ 状态标签
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("油量")
-                                .font(.system(size: 11)).foregroundColor(C.faint)
-                            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                                Text(st.fuel.isEmpty ? "--" : st.fuel)
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundColor(C.txt)
-                                Text("L").font(.system(size: 12)).foregroundColor(C.muted)
-                                Text("· \(st.fuelPct)%")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(C.blue)
-                            }
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("续航")
+                            Text("剩余续航")
                                 .font(.system(size: 11)).foregroundColor(C.faint)
                             HStack(alignment: .firstTextBaseline, spacing: 3) {
                                 Text(st.range.isEmpty ? "--" : st.range)
@@ -253,16 +267,19 @@ struct CarHomeView: View {
                                 Text("km").font(.system(size: 12)).foregroundColor(C.muted)
                             }
                         }
-                    }
-                    // 进度条
-                    GeometryReader { g in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(C.bg)
-                            Capsule().fill(C.blue)
-                                .frame(width: g.size.width * CGFloat(min(100, max(0, st.fuelPct))) / 100)
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 6) {
+                            Text(st.lockFL ? "已锁车" : "未锁车")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(st.lockFL ? C.green : C.amber)
+                            if st.sunOpen {
+                                Text("天窗开启").font(.system(size: 11)).foregroundColor(C.amber)
+                            }
+                            if st.engineOn {
+                                Text("发动机运行").font(.system(size: 11)).foregroundColor(C.blue)
+                            }
                         }
                     }
-                    .frame(height: 6)
 
                     Divider().opacity(0.5)
 
@@ -451,13 +468,16 @@ struct CarHomeView: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 12) {
                     ctl("启动", "power", "OpenEngine")
                     ctl("熄火", "power.circle", "CloseEngine")
-                    ctl("开空调", "snowflake", "openair")
-                    ctl("关空调", "wind", "closeair")
-                    ctl("升窗", "arrow.up.square", "CloseWindow")
-                    ctl("降窗", "arrow.down.square", "OpenWindow")
-                    ctl("留缝", "rectangle.split.3x1", "VentWindow")
-                    ctl("开天窗", "sun.max", "OpenSunroof")
-                    ctl("寻车", "location.magnifyingglass", "RemoteSearchCar")
+                    ctl("开空调", "snowflake", "openAir")
+                    ctl("关空调", "wind", "closeAir")
+                    ctl("开窗", "arrow.down.square", "OpenWindow")
+                    ctl("车窗留缝", "rectangle.split.3x1", "WindowSlit")
+                    ctl("关窗", "arrow.up.square", "CloseWindow")
+                    ctl("开天窗", "sun.max", "OpenDormer")
+                    ctl("天窗翘起", "sun.max.fill", "SkyWindowLiftUp")
+                    ctl("关天窗", "sun.min", "CloseDormer")
+                    ctl("闪灯", "lightbulb", "FlashLight")
+                    ctl("鸣笛寻车", "speaker.wave.2.fill", "RemoteSearchCar")
                 }
             }
         }
@@ -483,18 +503,12 @@ struct CarHomeView: View {
     // MARK: 动作
     private func refresh() {
         loading = true
-        api.refreshIfNeeded { ok in
-            guard ok else { loading = false; return }
-            api.carData { d in
-                DispatchQueue.main.async {
-                    if let d = d {
-                        st = CarState(d)
-                        AppGroupStore.sync(st)
-                        AppGroupStore.syncCredentials()
-                        WidgetCenter.shared.reloadAllTimelines()
-                    }
-                    loading = false
-                }
+        api.carData { d in
+            DispatchQueue.main.async {
+                if let d = d { st = CarState(d) }
+                AppGroupStore.syncFromPrefs()
+                AppGroupStore.syncCredentials()
+                loading = false
             }
         }
     }
@@ -552,39 +566,55 @@ struct CarState {
     var lockFL = true, lockFR = true, lockRL = true, lockRR = true
     var trunk = false, hood = false
     var winFL = false, winFR = false, winRL = false, winRR = false
+    // 小组件版新增
+    var series = ""
+    var seriesName = ""
+    var addr = ""
+    var updatedAt = 0
+    var sunOpen = false
+    var engineOn = false
+    var airOn = false
 
     init() {}
 
+    /// 新协议：CarAPI.carData 把缓存拼成扁平字典
     init(_ d: [String: Any]) {
-        func s(_ k: String) -> String {
+        func str(_ k: String) -> String {
             if let v = d[k] as? String { return v }
-            if let v = d[k] as? Int { return "\(v)" }
-            if let v = d[k] as? Double { return String(format: "%.1f", v) }
+            if let v = d[k] as? Int { return v > 0 ? "\(v)" : "" }
+            if let v = d[k] as? Double { return v > 0 ? String(format: "%.0f", v) : "" }
             return ""
         }
-        func b(_ k: String) -> Bool { (d[k] as? Int) == 1 }
-        func b0(_ k: String) -> Bool { (d[k] as? Int) == 0 }   // 锁：0=已锁
+        func int(_ k: String) -> Int {
+            if let v = d[k] as? Int { return v }
+            if let v = d[k] as? Double { return Int(v) }
+            return 0
+        }
+        func flag(_ k: String) -> Bool {
+            if let v = d[k] as? Bool { return v }
+            return int(k) == 1
+        }
 
-        fuel = s("fuelLeftover")
-        let f = Double(fuel) ?? 0
-        fuelPct = Int(round(f / 53 * 100))
-        range = s("remainedOilMile")
-        odometer = s("totalOdometer")
-        voltage = s("batteryVoltage")
-        outTemp = s("environmentalTemp")
-        lf = s("lfTyrePressure"); rf = s("rfTyrePressure")
-        lr = s("lrTyrePressure"); rr = s("rrTyrePressure")
+        carName = (d["carName"] as? String) ?? ""
+        series = (d["series"] as? String) ?? ""
+        seriesName = (d["seriesName"] as? String) ?? ""
+        range = str("range")
+        addr = str("addr")
+        updatedAt = int("updatedAt")
 
-        doorFL = b("leftFrontDoor");  doorFR = b("rightFrontDoor")
-        doorRL = b("leftRearDoor");   doorRR = b("rightRearDoor")
-        lockFL = b0("leftFrontDoorLock");  lockFR = b0("rightFrontDoorLock")
-        lockRL = b0("leftRearDoorLock");   lockRR = b0("rightRearDoorLock")
-        trunk = b("trunk"); hood = b("hood")
-        winFL = b("leftFrontDoorrWindow"); winFR = b("rightFrontDoorrWindow")
-        winRL = b("leftRearWindow");       winRR = b("rightRearWindow")
+        let locked = flag("locked")
+        lockFL = locked; lockFR = locked; lockRL = locked; lockRR = locked
 
-        terminalTime = s("terminalTime")
-        online = !terminalTime.isEmpty
+        let win = flag("winOpen")
+        winFL = win; winFR = win; winRL = win; winRR = win
+        sunOpen = flag("sunOpen")
+        trunk = flag("trunk")
+        engineOn = flag("engineOn")
+        airOn = flag("airOn")
+
+        lf = str("tpFL"); rf = str("tpFR")
+        lr = str("tpRL"); rr = str("tpRR")
+        online = !range.isEmpty
     }
 
     var anyOpen: Bool { doorFL || doorFR || doorRL || doorRR || winFL || winFR || winRL || winRR }

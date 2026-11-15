@@ -6,37 +6,27 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             CarHomeView()
-                .tabItem {
-                    Label("车控", systemImage: "car.fill")
-                }
+                .tabItem { Label("车控", systemImage: "car.fill") }
                 .tag(0)
 
             NavigationView { LocationView() }
                 .navigationViewStyle(.stack)
-                .tabItem {
-                    Label("位置", systemImage: "map.fill")
-                }
+                .tabItem { Label("位置", systemImage: "map.fill") }
                 .tag(1)
 
-            NavigationView { FuelView() }
+            NavigationView { TrackView() }
                 .navigationViewStyle(.stack)
-                .tabItem {
-                    Label("油耗", systemImage: "fuelpump.fill")
-                }
+                .tabItem { Label("轨迹", systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
                 .tag(2)
 
-            NavigationView { MaintainView() }
+            NavigationView { HistoryView() }
                 .navigationViewStyle(.stack)
-                .tabItem {
-                    Label("维保", systemImage: "wrench.and.screwdriver.fill")
-                }
+                .tabItem { Label("记录", systemImage: "clock.arrow.circlepath") }
                 .tag(3)
 
             NavigationView { MoreView() }
                 .navigationViewStyle(.stack)
-                .tabItem {
-                    Label("我的", systemImage: "person.crop.circle.fill")
-                }
+                .tabItem { Label("我的", systemImage: "person.crop.circle.fill") }
                 .tag(4)
         }
         .tint(C.blue)

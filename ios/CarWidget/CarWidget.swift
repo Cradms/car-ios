@@ -14,16 +14,81 @@ enum Shared {
     static func set(_ v: String, _ k: String) { defaults.set(v, forKey: k) }
 
     static var fuel: String { str("w_fuel") }
-    static var range: String { str("w_range") }
+    static var range: String {
+        let n = defaults.integer(forKey: "w_range")
+        return n > 0 ? "\(n)" : ""
+    }
     static var odo: String { str("w_odo") }
     static var voltage: String { str("w_voltage") }
     static var carName: String { str("w_car") }
-    static var online: Bool { str("w_online") == "1" }
-    static var anyOpen: Bool { str("w_open") == "1" }
-    static var locked: Bool { str("w_locked") == "1" }
+    static var online: Bool { str("w_online") == "1" || defaults.integer(forKey: "w_logged") == 1 }
+    static var anyOpen: Bool {
+        defaults.integer(forKey: "w_win") == 1 || defaults.integer(forKey: "w_sun") == 1
+    }
+    static var locked: Bool { defaults.integer(forKey: "w_locked") == 1 }
     static var updated: Date {
         let t = defaults.double(forKey: "w_at")
         return t > 0 ? Date(timeIntervalSince1970: t) : Date(timeIntervalSince1970: 0)
+    }
+
+    // 车型（4.5.6 小组件按车型选车模图）
+    static var series: String { str("w_series") }
+    static var seriesName: String { str("w_series_name") }
+
+    /// 与 CarModel.normalize 对齐（小组件 target 不带 CarModel.swift）
+    static func normalize(_ s: String) -> String {
+        let u = s.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if u.isEmpty { return "" }
+        if u.contains("逸动") && u.contains("PLUS") { return "C211" }
+        if u.contains("启源") && u.contains("A07") { return "C236" }
+        if u.contains("UNI-V") { return "C281" }
+        if u.contains("启源") && u.contains("A06") { return "C281_P" }
+        if u.contains("逸达") { return "C589" }
+        if u.contains("启源") && u.contains("A05") { return "C589_P" }
+        if u.contains("UNI-K") { return "CD569" }
+        if u.contains("UNI-T") { return "S202" }
+        if u.contains("CS55") { return "S203" }
+        if u.contains("启源") && u.contains("Q05") { return "S203_P" }
+        if u.contains("CS75") {
+            if u.contains("四代") { return "S311MCA" }
+            if u.contains("三代") { return "S311_P" }
+            return "S311"
+        }
+        if u == "C211-1" { return "C211" }
+        var v = u
+        if let d = v.firstIndex(of: "-"), d != v.startIndex { v = String(v[v.startIndex..<d]) }
+        let codes: Set<String> = ["C211", "C236", "C281", "C281_P", "C589", "C589_P",
+                                  "CD569", "S202", "S203", "S203_P", "S311", "S311_P", "S311MCA"]
+        return codes.contains(v) ? v : ""
+    }
+
+    static var modelCode: String {
+        let a = normalize(seriesName)
+        return a.isEmpty ? normalize(series) : a
+    }
+
+    static var carImage: String {
+        let c = modelCode
+        return c.isEmpty ? "car" : "car_" + c.lowercased()
+    }
+
+    static var modelTitle: String {
+        switch modelCode {
+        case "C211": return "逸动 PLUS"
+        case "C236": return "启源 A07"
+        case "C281": return "UNI-V"
+        case "C281_P": return "启源 A06"
+        case "C589": return "逸达 / 逸动"
+        case "C589_P": return "启源 A05"
+        case "CD569": return "UNI-K"
+        case "S202": return "UNI-T"
+        case "S203": return "CS55 Plus"
+        case "S203_P": return "启源 Q05"
+        case "S311": return "CS75 Plus 二代"
+        case "S311_P": return "CS75 Plus 三代"
+        case "S311MCA": return "CS75 Plus 四代"
+        default: return seriesName
+        }
     }
 
     static func saveState(fuel: String, range: String, odo: String, voltage: String,
@@ -55,13 +120,16 @@ struct Entry: TimelineEntry {
     let anyOpen: Bool
     let locked: Bool
     let updated: Date
+    var modelTitle: String = ""
+    var carImage: String = "car"
 }
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> Entry {
         Entry(date: Date(), fuel: "42", range: "601", odo: "54846",
               voltage: "12.2", carName: "UNI-V", online: true,
-              anyOpen: false, locked: true, updated: Date())
+              anyOpen: false, locked: true, updated: Date(),
+              modelTitle: "UNI-V", carImage: "car_c281")
     }
 
     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
@@ -85,7 +153,9 @@ struct Provider: TimelineProvider {
               online: Shared.online,
               anyOpen: Shared.anyOpen,
               locked: Shared.locked,
-              updated: Shared.updated)
+              updated: Shared.updated,
+              modelTitle: Shared.modelTitle,
+              carImage: Shared.carImage)
     }
 }
 
@@ -120,6 +190,8 @@ struct CarWidgetEntryView: View {
                 Text(entry.carName).font(.system(size: 11, weight: .semibold))
                     .foregroundColor(txt).lineLimit(1)
                 Spacer()
+                Image(entry.carImage)
+                    .resizable().scaledToFit().frame(height: 20)
             }
             Spacer(minLength: 0)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
@@ -153,9 +225,15 @@ struct CarWidgetEntryView: View {
                 Circle().fill(entry.online ? green : faint).frame(width: 5, height: 5)
                 Text(entry.carName).font(.system(size: 12, weight: .semibold))
                     .foregroundColor(txt).lineLimit(1)
+                if !entry.modelTitle.isEmpty {
+                    Text(entry.modelTitle)
+                        .font(.system(size: 9)).foregroundColor(muted).lineLimit(1)
+                }
                 Spacer()
                 Text(entry.online ? "在线" : "离线")
                     .font(.system(size: 9)).foregroundColor(faint)
+                Image(entry.carImage)
+                    .resizable().scaledToFit().frame(height: 30)
             }
 
             HStack(alignment: .top, spacing: 0) {
@@ -186,9 +264,9 @@ struct CarWidgetEntryView: View {
 
             // 快捷控车（点击打开 App 对应操作，Widget 内不能直接发请求）
             HStack(spacing: 6) {
-                quickBtn("锁车", "lock.fill")
-                quickBtn("闪灯", "lightbulb.fill")
-                quickBtn("鸣笛", "speaker.wave.2.fill")
+                quickBtn("锁车", "lock.fill", "LockDoor")
+                quickBtn("解锁", "lock.open.fill", "UnLockDoor")
+                quickBtn("闪灯", "lightbulb.fill", "FlashLight")
             }
         }
         .padding(12)
@@ -228,8 +306,8 @@ struct CarWidgetEntryView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func quickBtn(_ t: String, _ icon: String) -> some View {
-        Link(destination: URL(string: "carapp://action?cmd=\(t)")!) {
+    private func quickBtn(_ t: String, _ icon: String, _ cmd: String) -> some View {
+        Link(destination: URL(string: "carapp://action?cmd=\(cmd)")!) {
             VStack(spacing: 2) {
                 Image(systemName: icon).font(.system(size: 12))
                 Text(t).font(.system(size: 8.5))

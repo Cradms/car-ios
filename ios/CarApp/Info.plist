@@ -23,6 +23,18 @@
 
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- 小组件控件回跳（carapp://action?cmd=LockDoor） -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.yg.carapp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>carapp</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIStatusBarStyle</key>
