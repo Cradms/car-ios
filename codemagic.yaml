@@ -19,11 +19,6 @@ workflows:
         script: |
           brew install xcodegen
 
-      - name: 同步 H5 页面进 App
-        script: |
-          chmod +x ios/sync_site.sh
-          ./ios/sync_site.sh
-
       - name: 生成 Xcode 工程
         script: |
           cd ios
@@ -70,11 +65,6 @@ workflows:
     scripts:
       - name: 装 XcodeGen
         script: brew install xcodegen
-
-      - name: 同步 H5 页面进 App
-        script: |
-          chmod +x ios/sync_site.sh
-          ./ios/sync_site.sh
 
       - name: 生成工程
         script: |

@@ -154,6 +154,16 @@ final class CarAPI {
         }.resume()
     }
 
+    /// 有 token 就先直接用，失败再用 refresh_token 换
+    func refreshIfNeeded(done: @escaping (Bool) -> Void) {
+        guard !accessToken.isEmpty else { done(false); return }
+        // 先试探一次（能拿到车就说明有效）
+        carData { d in
+            if d != nil { done(true); return }
+            self.refresh { ok in done(ok) }
+        }
+    }
+
     func loadCar(done: @escaping (Bool, String) -> Void) {
         request("/app2/api/user/cars", query: ["type": "0", "token": accessToken]) { obj in
             let arr = (obj?["data"] as? [[String: Any]]) ?? []
