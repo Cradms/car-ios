@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
 # 把构建好的 site/ 同步进 App 资源目录（供 WKURLSchemeHandler 读取）
+# CI 上没有 site/ 时，直接沿用仓库里已提交的 ios/Resources/site
 set -e
 cd "$(dirname "$0")/.."
+
+if [ ! -d "site" ]; then
+  if [ -d "ios/Resources/site" ]; then
+    echo "未找到 site/，沿用仓库内已有的 ios/Resources/site"
+    echo "文件数：$(find ios/Resources/site -type f | wc -l | tr -d ' ')"
+    exit 0
+  fi
+  echo "既没有 site/ 也没有 ios/Resources/site" >&2
+  exit 1
+fi
+
 python - <<'PY'
 import os, shutil
 SRC, DST = "site", "ios/Resources/site"
-if not os.path.isdir(SRC):
-    raise SystemExit("缺少 site/，先运行： python build.py")
 if os.path.isdir(DST):
     shutil.rmtree(DST)
 n = 0
