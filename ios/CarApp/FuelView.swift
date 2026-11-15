@@ -302,6 +302,12 @@ struct DailyFuel: Identifiable {
     let fuel: Double?
 }
 
+struct MonthlyFuel: Identifiable {
+    let id = UUID()
+    let label: String
+    let fuel: Double
+}
+
 // MARK: - 记一笔
 struct FuelFormView: View {
     var onSave: (FuelRecord) -> Void

@@ -2,7 +2,7 @@ name: CarApp
 options:
   bundleIdPrefix: com.yg
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "16.0"
   createIntermediateGroups: true
 
 targets:
