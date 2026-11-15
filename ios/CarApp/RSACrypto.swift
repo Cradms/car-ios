@@ -4,38 +4,37 @@ import Security
 /// 长安控车用的 RSA-OAEP(SHA256) 加密
 enum RSACrypto {
 
-    /// 把服务端返回的公钥（PEM / 裸 base64 / DER）转成 SecKey
+    /// 把服务端返回的公钥转成 SecKey
+    /// 长安下发的是 SPKI(X.509) base64；iOS 只吃 PKCS#1，需要拆 BIT STRING
     static func publicKey(from raw: String) -> SecKey? {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        // 去掉 PEM 头尾和换行
         s = s.replacingOccurrences(of: "-----BEGIN PUBLIC KEY-----", with: "")
              .replacingOccurrences(of: "-----END PUBLIC KEY-----", with: "")
              .replacingOccurrences(of: "-----BEGIN RSA PUBLIC KEY-----", with: "")
              .replacingOccurrences(of: "-----END RSA PUBLIC KEY-----", with: "")
-             .replacingOccurrences(of: "\n", with: "")
-             .replacingOccurrences(of: "\r", with: "")
-             .replacingOccurrences(of: " ", with: "")
+        s = s.components(separatedBy: .whitespacesAndNewlines).joined()
         guard let der = Data(base64Encoded: s, options: .ignoreUnknownCharacters) else {
             return nil
         }
 
         let attrs: [CFString: Any] = [
             kSecAttrKeyType: kSecAttrKeyTypeRSA,
-            kSecAttrKeyClass: kSecAttrKeyClassPublic,
-            kSecAttrKeySizeInBits: 2048
+            kSecAttrKeyClass: kSecAttrKeyClassPublic
         ]
-        var err: Unmanaged<CFError>?
-        if let key = SecKeyCreateWithData(der as CFData, attrs as CFDictionary, &err) {
-            return key
+
+        // 1) 先直接试（万一已经是 PKCS#1）
+        if let k = SecKeyCreateWithData(der as CFData, attrs as CFDictionary, nil) {
+            return k
         }
-        // 可能是 PKCS#1 格式，包一层 SubjectPublicKeyInfo 再试
-        if let spki = wrapPKCS1ToSPKI(der) {
-            return SecKeyCreateWithData(spki as CFData, attrs as CFDictionary, &err)
+        // 2) SPKI → 提取 BIT STRING 里的 RSAPublicKey
+        if let pkcs1 = extractPKCS1(der),
+           let k = SecKeyCreateWithData(pkcs1 as CFData, attrs as CFDictionary, nil) {
+            return k
         }
         return nil
     }
 
-    /// RSA/ECB/OAEPWithSHA-256AndMGF1Padding
+    /// RSA/ECB/OAEPWithSHA-256AndMGF1Padding（与 Python 端 rsa_enc.encrypt_oaep 一致）
     static func encryptOAEP(_ plaintext: String, publicKeyPEM: String) -> String? {
         guard let key = publicKey(from: publicKeyPEM),
               let data = plaintext.data(using: .utf8) else { return nil }
@@ -47,29 +46,55 @@ enum RSACrypto {
         return (cipher as Data).base64EncodedString()
     }
 
-    // PKCS#1 RSAPublicKey -> SubjectPublicKeyInfo
-    private static func wrapPKCS1ToSPKI(_ pkcs1: Data) -> Data? {
-        let algoId: [UInt8] = [
-            0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86,
-            0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00
-        ]
-        let bitString = [UInt8](arrayLiteral: 0x00) + [UInt8](pkcs1)   // 前导 0（无未用位）
-        let inner = algoId + derTag(0x03, bitString)
-        return Data(derTag(0x30, inner))
+    // MARK: - DER
+
+    /// 读一个 TLV，返回 (tag, value, nextIndex)
+    private static func readTLV(_ b: [UInt8], _ i: Int) -> (UInt8, [UInt8], Int)? {
+        guard i + 2 <= b.count else { return nil }
+        let tag = b[i]
+        var idx = i + 1
+        var len = Int(b[idx]); idx += 1
+        if len & 0x80 != 0 {
+            let n = len & 0x7F
+            guard n > 0, idx + n <= b.count else { return nil }
+            len = 0
+            for k in 0..<n { len = (len << 8) | Int(b[idx + k]) }
+            idx += n
+        }
+        guard idx + len <= b.count else { return nil }
+        return (tag, Array(b[idx..<(idx + len)]), idx + len)
     }
 
-    private static func derTag(_ tag: UInt8, _ body: [UInt8]) -> [UInt8] {
-        var out = [tag]
-        let n = body.count
+    /// SPKI: SEQUENCE { AlgorithmIdentifier SEQUENCE, BIT STRING }
+    /// 返回 BIT STRING 内（去掉 unused-bits 字节）的 RSAPublicKey 内容
+    private static func extractPKCS1(_ der: Data) -> Data? {
+        let b = [UInt8](der)
+        guard let (tag0, body0, _) = readTLV(b, 0), tag0 == 0x30 else { return nil }
+
+        var i = 0
+        // 第一个子项：AlgorithmIdentifier
+        guard let (t1, _, next1) = readTLV(body0, i), t1 == 0x30 else { return nil }
+        i = next1
+        // 第二个子项：BIT STRING
+        guard let (t2, bitStr, _) = readTLV(body0, i), t2 == 0x03 else { return nil }
+        guard bitStr.count > 1 else { return nil }
+        // 第一个字节是 unused bits 数，跳过
+        let inner = Array(bitStr.dropFirst())
+
+        // 内层应是 SEQUENCE { INTEGER n, INTEGER e }
+        guard let (t3, seqBody, _) = readTLV(inner, 0), t3 == 0x30 else { return nil }
+        // 重新拼一个完整的 SEQUENCE TLV 交给 SecKeyCreateWithData
+        var out: [UInt8] = [0x30]
+        let n = seqBody.count
         if n < 0x80 {
             out.append(UInt8(n))
         } else if n < 0x100 {
             out.append(contentsOf: [0x81, UInt8(n)])
         } else {
-            out.append(contentsOf: [0x82, UInt8((n >> 8) & 0xff), UInt8(n & 0xff)])
+            out.append(contentsOf: [0x82, UInt8((n >> 8) & 0xFF), UInt8(n & 0xFF)])
         }
-        out.append(contentsOf: body)
-        return out
+        out.append(contentsOf: seqBody)
+        return Data(out)
     }
 }
 
