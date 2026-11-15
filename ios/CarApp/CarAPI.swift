@@ -587,8 +587,8 @@ final class CarAPI {
         p["timestamp"] = "\(Int(Date().timeIntervalSince1970))"
         p["nonce"] = Self.NONCE
         p["appKey"] = Self.CLIENT_SECRET
-        let raw = p.keys.sorted().map { "\($0)=\(p[$0] ?? "")&" }.joined()
-        p["sign"] = sha256(raw).uppercased()
+        let rawStr = p.keys.sorted().map { "\($0)=\(p[$0] ?? "")&" }.joined()
+        p["sign"] = sha256(rawStr).uppercased()
 
         let (d, _) = raw(Self.OPEN_HOST + path, method: "POST", form: p)
         guard let o = json(d) else { return false }

@@ -195,23 +195,23 @@ struct CarWidgetEntryView: View {
             }
             Spacer(minLength: 0)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(entry.fuel).font(.system(size: 26, weight: .bold)).foregroundColor(txt)
-                Text("L").font(.system(size: 10)).foregroundColor(muted)
+                Text(entry.range).font(.system(size: 26, weight: .bold)).foregroundColor(txt)
+                Text("km").font(.system(size: 10)).foregroundColor(muted)
             }
-            HStack(spacing: 2) {
-                Text(entry.range).font(.system(size: 14, weight: .semibold)).foregroundColor(blue)
-                Text("km").font(.system(size: 9)).foregroundColor(faint)
-            }
-            Spacer(minLength: 0)
             HStack(spacing: 4) {
                 Image(systemName: entry.locked ? "lock.fill" : "lock.open.fill")
-                    .font(.system(size: 8))
+                    .font(.system(size: 9))
                     .foregroundColor(entry.locked ? green : red)
+                Text(entry.locked ? "已锁车" : "未锁车")
+                    .font(.system(size: 9.5)).foregroundColor(entry.locked ? green : red)
+                Spacer()
+            }
+            HStack(spacing: 4) {
                 Image(systemName: entry.anyOpen ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                    .font(.system(size: 8))
+                    .font(.system(size: 9))
                     .foregroundColor(entry.anyOpen ? red : green)
-                Text(entry.anyOpen ? "有开启" : "全关闭")
-                    .font(.system(size: 8.5)).foregroundColor(entry.anyOpen ? red : green)
+                Text(entry.anyOpen ? "车窗天窗有开启" : "车窗天窗全关")
+                    .font(.system(size: 9.5)).foregroundColor(entry.anyOpen ? red : green)
                 Spacer()
             }
         }
@@ -238,10 +238,11 @@ struct CarWidgetEntryView: View {
 
             HStack(alignment: .top, spacing: 0) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("油量").font(.system(size: 9)).foregroundColor(faint)
+                    Text("门锁").font(.system(size: 9)).foregroundColor(faint)
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(entry.fuel).font(.system(size: 24, weight: .bold)).foregroundColor(txt)
-                        Text("L").font(.system(size: 9)).foregroundColor(muted)
+                        Text(entry.locked ? "已锁" : "未锁")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(entry.locked ? green : red)
                     }
                 }
                 Spacer()
