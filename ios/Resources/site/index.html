@@ -7,24 +7,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>远程控车系统 - 登录</title>
     <meta name="description" content="远程控车系统登录页面">
-    <meta name="theme-color" content="#05070d">
+    <meta name="theme-color" content="#F3F6FA">
     <script src="/static/vendor/tailwind.js"></script>
     <style>
         :root {
-            --bg0: #05070d;
-            --card: rgba(148, 163, 184, .07);
-            --card2: rgba(148, 163, 184, .12);
-            --border: rgba(148, 163, 184, .15);
-            --txt: #e2e8f0;
-            --muted: #7d8aa3;
-            --faint: #4b5871;
-            --cyan: #ff5a52;
-            --blue: #ef4444;
-            --green: #34d399;
-            --amber: #fbbf24;
+            --bg0: #F3F6FA;
+            --card: #FFFFFF;
+            --card2: #F8FAFC;
+            --border: #E6EBF1;
+            --txt: #1A1E24;
+            --muted: #7B8592;
+            --faint: #98A2AF;
+            --cyan: #2F6FB5;
+            --blue: #2F6FB5;
+            --green: #2F9E68;
+            --amber: #D98324;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html { color-scheme: dark; }
+        html { color-scheme: light; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
             background: var(--bg0);
@@ -37,37 +37,35 @@
             position: fixed;
             inset: 0;
             background:
-                radial-gradient(600px 320px at 85% -5%, rgba(255, 90, 82, .10), transparent 60%),
-                radial-gradient(700px 380px at -10% 25%, rgba(239, 68, 68, .11), transparent 60%),
-                radial-gradient(500px 500px at 50% 115%, rgba(99, 102, 241, .08), transparent 60%);
+                radial-gradient(600px 320px at 85% -5%, rgba(47, 111, 181, .07), transparent 60%),
+                radial-gradient(700px 380px at -10% 25%, rgba(47, 111, 181, .05), transparent 60%),
+                radial-gradient(500px 500px at 50% 115%, rgba(47, 111, 181, .04), transparent 60%);
             pointer-events: none;
             z-index: 0;
         }
         .glass-card {
-            background: linear-gradient(165deg, rgba(148, 163, 184, .10), rgba(148, 163, 184, .05));
-            border: 1px solid var(--border);
-            box-shadow: 0 24px 60px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
+            background: #FFFFFF;
+            border: 1px solid #E6EBF1;
+            box-shadow: 0 2px 12px rgba(15, 23, 42, .05);
         }
         .logo-badge {
             width: 52px; height: 52px;
             border-radius: 16px;
-            background: linear-gradient(135deg, #ff5a52, #ef4444 60%, #dc2626);
+            background: linear-gradient(135deg, #4A86C8, #2F6FB5 60%, #245C99);
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 8px 24px rgba(255, 90, 82, .35);
+            box-shadow: 0 8px 20px rgba(47, 111, 181, .28);
         }
         .input-wrap {
             display: flex; align-items: center; gap: 10px;
-            background: rgba(5, 8, 16, .55);
-            border: 1.5px solid var(--border);
-            border-radius: 14px;
+            background: #FFFFFF;
+            border: 1px solid #E6EBF1;
+            border-radius: 12px;
             padding: 0 14px;
             transition: border-color .18s ease, box-shadow .18s ease;
         }
         .input-wrap:focus-within {
-            border-color: rgba(255, 90, 82, .55);
-            box-shadow: 0 0 0 3px rgba(255, 90, 82, .12);
+            border-color: rgba(47, 111, 181, .55);
+            box-shadow: 0 0 0 3px rgba(47, 111, 181, .10);
         }
         .input-wrap svg { flex-shrink: 0; color: var(--faint); transition: color .18s ease; }
         .input-wrap:focus-within svg { color: var(--cyan); }
@@ -84,11 +82,11 @@
             display: flex; align-items: center; justify-content: center; gap: 8px;
             width: 100%;
             padding: 14px;
-            border-radius: 14px;
+            border-radius: 12px;
             font-size: 15px; font-weight: 600;
             color: #fff;
-            background: linear-gradient(135deg, #fb923c, #ef4444 70%, #b91c1c);
-            box-shadow: 0 8px 22px rgba(220, 38, 38, .4), inset 0 1px 0 rgba(255, 255, 255, .2);
+            background: linear-gradient(135deg, #4A86C8, #2F6FB5 70%, #245C99);
+            box-shadow: 0 6px 18px rgba(47, 111, 181, .28);
             transition: transform .12s ease, filter .15s ease, opacity .15s ease;
         }
         .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
@@ -96,7 +94,7 @@
         .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
         .tab-bar {
             display: flex;
-            background: rgba(5, 8, 16, .55);
+            background: #EEF3F9;
             border: 1px solid var(--border);
             border-radius: 13px;
             padding: 4px;
@@ -112,9 +110,9 @@
             transition: all .18s ease;
         }
         .tab-active {
-            background: linear-gradient(135deg, #fb923c, #ef4444);
+            background: linear-gradient(135deg, #4A86C8, #2F6FB5);
             color: #fff;
-            box-shadow: 0 3px 10px rgba(220, 38, 38, .35);
+            box-shadow: 0 3px 10px rgba(47, 111, 181, .25);
         }
         .code-btn {
             flex-shrink: 0;
@@ -122,17 +120,17 @@
             border-radius: 12px;
             font-size: 13px; font-weight: 500;
             color: var(--cyan);
-            background: rgba(255, 90, 82, .10);
-            border: 1px solid rgba(255, 90, 82, .3);
+            background: #EAF1FA;
+            border: 1px solid #C9DCF0;
             transition: all .15s ease;
             white-space: nowrap;
             height: 46px;
         }
-        .code-btn:hover:not(:disabled) { background: rgba(255, 90, 82, .18); }
+        .code-btn:hover:not(:disabled) { background: #DCE8F6; }
         .code-btn:disabled { opacity: .5; cursor: not-allowed; }
         .checkbox {
             width: 16px; height: 16px;
-            accent-color: #ff5a52;
+            accent-color: #2F6FB5;
             border-radius: 4px;
         }
         .spinner {
@@ -166,7 +164,7 @@
     <div id="bootLoader" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#f1f5f9">
         <div style="width:34px;height:34px;border-radius:50%;border:3px solid rgba(59,130,246,.18);border-top-color:#3b82f6;animation:btspin .8s linear infinite"></div>
         <p style="font-size:12px;color:#64748b;margin:0">正在加载…</p>
-        <style>@keyframes btspin{to{transform:rotate(360deg)}}@media (prefers-color-scheme:dark){#bootLoader{background:#0f172a}#bootLoader p{color:#94a3b8}}</style>
+        <style>@keyframes btspin{to{transform:rotate(360deg)}}</style>
     </div>
     <script>
         window.addEventListener('DOMContentLoaded', function () { var b = document.getElementById('bootLoader'); if (b) b.remove(); });
@@ -182,7 +180,7 @@
             <p class="text-xs rise rise-1" style="color:var(--muted)">Remote Vehicle Control</p>
             <div class="mt-4 rise rise-2">
                 <div class="car-float">
-                    <img src="static/img/car_side.png?v=2" alt="逸动PLUS" class="w-4/5 h-auto mx-auto block select-none" draggable="false" style="filter:drop-shadow(0 12px 24px rgba(15,23,42,.16))">
+                    <img src="static/img/univ_side.png?v=3" alt="UNI-V" class="w-4/5 h-auto mx-auto block select-none" draggable="false" style="filter:drop-shadow(0 12px 24px rgba(15,23,42,.16))">
                 </div>
                 <div class="car-shadow"></div>
             </div>

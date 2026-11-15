@@ -253,12 +253,15 @@
             box.id = 'realLocMap';
             box.style.cssText = 'height:150px;border-radius:12px;margin-top:10px;overflow:hidden;background:#eef2f7';
             card.appendChild(box);
-            // 位置直接显示，不再隐藏
+            // 位置直接显示：只切显示状态，绝不触发详情弹窗
             setInterval(function () {
               var a = document.getElementById('locCardAddress');
               if (!a) return;
+              // 已隐藏就只改文案，不点卡片（点卡片会弹窗）
               if ((a.textContent || '').indexOf('隐藏') >= 0) {
-                try { if (window.locCardTap) window.locCardTap(); } catch (e) {}
+                try {
+                  if (window.toggleLocCard) window.toggleLocCard();
+                } catch (e) {}
               }
               var m = document.getElementById('realLocMap');
               if (m && getComputedStyle(m).display === 'none') {
@@ -568,6 +571,102 @@
         };
       })();
 
+      // 位置卡片：点一下只负责"显示位置"，不打开详情弹窗（弹窗只由导航按钮触发）
+      (function () {
+        var patch = function () {
+          if (typeof window.locCardTap !== 'function' || window.__locTapPatched) return;
+          window.locCardTap = function () {
+            try {
+              var a = document.getElementById('locCardAddress');
+              var hidden = a && (a.textContent || '').indexOf('隐藏') >= 0;
+              if (hidden && typeof window.toggleLocCard === 'function') window.toggleLocCard();
+              // 已经是显示状态：什么都不做，不弹窗
+            } catch (e) {}
+          };
+          window.__locTapPatched = true;
+        };
+        patch();
+        [800, 2000, 4000].forEach(function (ms) { setTimeout(patch, ms); });
+      })();
+
+      // 功能分类：快捷卡（开锁/闭锁/闪灯/鸣笛）并入控车卡，原卡隐藏
+      (function () {
+        var ICONS = {
+          unlock: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>',
+          lock: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 1 1 8 0v4"/></svg>',
+          flash: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1 1.5 1 2.5h6c0-1 .2-1.8 1-2.5A6 6 0 0 0 12 3Z"/></svg>',
+          whistle: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a5 5 0 0 1 5-5h6l4 5h3v5a4 4 0 0 1-4 4H8a5 5 0 0 1-5-5Z"/><circle cx="10" cy="13" r="2"/></svg>'
+        };
+        var ROW = [
+          ['开锁', 'UnLockDoor', ICONS.unlock],
+          ['闭锁', 'LockDoor', ICONS.lock],
+          ['闪灯', 'FlashLight', ICONS.flash],
+          ['鸣笛', 'Whistle', ICONS.whistle]
+        ];
+
+        var build = function () {
+          var card = document.getElementById('ctrlCard');
+          if (!card || document.getElementById('shimQuickRow')) return;
+
+          // 隐藏原快捷卡（内容已并入控车卡）
+          var quick = document.getElementById('quickCard');
+          if (quick) quick.style.display = 'none';
+
+          var row = document.createElement('div');
+          row.id = 'shimQuickRow';
+          row.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 12px;';
+          row.innerHTML = ROW.map(function (it) {
+            return '<button type="button" data-cmd="' + it[1] + '" ' +
+                   'style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;' +
+                   'background:#F5F8FC;border:1px solid #E6EBF1;border-radius:12px;color:#2F6FB5;' +
+                   'font-size:10.5px;cursor:pointer;-webkit-tap-highlight-color:transparent">' +
+                   it[2] + '<span style="color:#5B6B85">' + it[0] + '</span></button>';
+          }).join('');
+          row.addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-cmd]');
+            if (!b) return;
+            var ph = '';
+            try { ph = localStorage.getItem('phone') || ''; } catch (err) {}
+            if (typeof window.performAction === 'function' && ph) {
+              window.performAction(ph, b.getAttribute('data-cmd'));
+            }
+          });
+
+          // 插到标题行后面
+          var head = card.querySelector('.card-title');
+          var host = head ? head.parentNode : card;
+          var anchorEl = host && host.parentNode === card ? host : null;
+          if (anchorEl) card.insertBefore(row, anchorEl.nextSibling);
+          else card.insertBefore(row, card.firstChild);
+
+          // 分隔标题：车锁/提醒 与 车窗/空调/寻车 分两组
+          if (!document.getElementById('shimGroupSep')) {
+            var sep = document.createElement('div');
+            sep.id = 'shimGroupSep';
+            sep.style.cssText = 'display:flex;align-items:center;gap:8px;margin:2px 0 10px;';
+            sep.innerHTML = '<span style="font-size:11px;color:#98A2AF;white-space:nowrap">车窗 · 空调 · 寻车</span>' +
+                            '<span style="flex:1;height:1px;background:#EEF2F7"></span>';
+            if (row.nextSibling) card.insertBefore(sep, row.nextSibling);
+            else card.appendChild(sep);
+          }
+        };
+
+        build();
+        [1000, 2500, 5000].forEach(function (ms) { setTimeout(build, ms); });
+      })();
+
+      // 一键关窗（门窗卡右上角按钮调用）
+      window.__closeAll = function () {
+        var phone = '';
+        try { phone = localStorage.getItem('phone') || ''; } catch (e) {}
+        if (typeof window.performAction !== 'function' || !phone) return;
+        window.performAction(phone, 'CloseWindow');
+        if (typeof window.showToast === 'function') window.showToast('正在关闭车窗…', 'success');
+        setTimeout(function () {
+          try { if (typeof window.loadCarData === 'function') window.loadCarData(); } catch (e) {}
+        }, 4000);
+      };
+
       // 车门 / 车窗状态：图标网格（图标 + 色点，尽量少文字）
       window.__renderDoors = function (st) {
         try {
@@ -614,10 +713,29 @@
                    '<span style="margin-left:auto;font-size:10px;font-weight:600">' + (open ? '开' : '关') + '</span></div>';
           };
 
+          var anyDoorOpen = Number(st.leftFrontDoor) === 1 || Number(st.rightFrontDoor) === 1 ||
+                            Number(st.leftRearDoor) === 1 || Number(st.rightRearDoor) === 1;
+          var anyWinOpen = Number(st.leftFrontDoorrWindow) === 1 || Number(st.rightFrontDoorrWindow) === 1 ||
+                           Number(st.leftRearWindow) === 1 || Number(st.rightRearWindow) === 1;
+
+          // 右上角状态：有开启显示可点的「一键关闭」，全关时显示绿色对勾
+          var chip = '';
+          if (anyDoorOpen || anyWinOpen) {
+            chip = '<button type="button" onclick="window.__closeAll()" ' +
+                   'style="display:inline-flex;align-items:center;gap:4px;border:1px solid #2F6FB5;' +
+                   'background:#2F6FB5;color:#fff;font-size:11px;font-weight:600;padding:5px 11px;' +
+                   'border-radius:99px;cursor:pointer;-webkit-tap-highlight-color:transparent">' +
+                   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 12h16M4 6h16M4 18h16"/></svg>' +
+                   '一键关闭</button>';
+          } else {
+            chip = '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:#2F9E68">' +
+                   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>' +
+                   '全部关闭</span>';
+          }
+
           var html = '<div style="background:#fff;border:1px solid #E6EBF1;border-radius:16px;padding:14px;margin:10px 14px 0">' +
             '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
-            '<span style="font-size:12px;color:#2F6FB5;font-weight:600">门窗</span>' +
-            '<span style="font-size:10px;color:#A6AFBA">' + (Number(st.leftFrontDoor) === 1 || Number(st.rightFrontDoor) === 1 || Number(st.leftRearDoor) === 1 || Number(st.rightRearDoor) === 1 ? '有开启' : '全部关闭') + '</span>' +
+            '<span style="font-size:12px;color:#2F6FB5;font-weight:600">门窗</span>' + chip +
             '</div>' +
             '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">' +
             doors.map(function (d) { return cell(d[0], d[1], d[2], d[3]); }).join('') +

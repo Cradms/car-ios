@@ -1247,7 +1247,7 @@
             </div>
             <!-- 2D 侧视图 + 门窗小红点 -->
             <div class="car-float relative w-[74%] mx-auto" id="car2dBox">
-                <img id="heroCarImg" src="static/img/car_side.webp?v=1" alt="逸动PLUS" class="w-full h-auto block select-none" draggable="false" style="filter:drop-shadow(0 16px 22px rgba(15,23,42,.18))">
+                <img id="heroCarImg" src="static/img/univ_side.png?v=3" alt="UNI-V" class="w-full h-auto block select-none" draggable="false" style="filter:drop-shadow(0 16px 22px rgba(15,23,42,.18))">
                 <div id="carFx" class="absolute inset-0 pointer-events-none" style="overflow:visible">
                     <div class="fx fx-dot fx-win-fl" style="left:37.5%;top:37%"><i></i></div>
                     <div class="fx fx-dot fx-win-rl" style="left:55.8%;top:35%"><i></i></div>
@@ -1707,7 +1707,7 @@
                 <div class="model-scroll">
                     <div class="model-hint">可滑动 →</div>
                     <div id="modelOptYidong" class="model-opt" onclick="pickCarModel('yidong')">
-                        <img src="static/img/car_side_tn.png?v=2" alt="逸动PLUS">
+                        <img src="static/img/univ_side_tn.png?v=3" alt="UNI-V">
                         <p class="text-[12px] font-bold mt-1.5">逸动PLUS</p>
                         <p class="text-[10px]" style="color:var(--faint)">三厢轿车</p>
                     </div>
@@ -6715,7 +6715,7 @@ await main();
 
         /* ===== 车型切换（主页车辆大图 + 门窗红点位置联动） ===== */
         var CAR_MODELS = {
-            yidong: { name: '逸动PLUS', img: 'static/img/car_side.webp?v=1', topImg: 'static/img/car_top_real.png?v=2', tank: 53,
+            yidong: { name: 'UNI-V', img: 'static/img/univ_side.png?v=3', topImg: 'static/img/car_top_real.png?v=2', tank: 53,
                 fx: { 'fx-win-fl': [37.5, 37], 'fx-win-rl': [55.8, 35], 'fx-door-fl': [55.8, 58.5], 'fx-door-rl': [78, 62] } },
             yidong_white: { name: '逸动PLUS 白色', img: 'static/img/yidong_white_side.webp?v=1', topImg: 'static/img/yidong_white_top.png?v=2', tank: 53,
                 fx: { 'fx-win-fl': [37.5, 37], 'fx-win-rl': [55.8, 35], 'fx-door-fl': [55.8, 58.5], 'fx-door-rl': [78, 62] } },
